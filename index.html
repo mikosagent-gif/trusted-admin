@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trusted Offers — Admin</title>
+<style>
+  :root {
+    --bg:#eef1f5; --panel:#fff; --panel2:#f8fafc; --border:#e2e8f0; --border2:#e7ecf2;
+    --head:#0f172a; --text:#1e293b; --muted:#64748b; --faint:#8a94a3;
+    --blue:#2563eb; --blue-bg:#dbeafe; --green:#16a34a; --amber:#b45309; --red:#dc2626; --purple:#7c3aed;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); font-size:14px; min-height:100vh; }
+  .shell { display:flex; min-height:100vh; }
+  .rail { width:200px; background:var(--panel2); border-right:1px solid var(--border); padding:18px 12px; flex-shrink:0; }
+  .logo { display:flex; align-items:center; gap:9px; margin-bottom:22px; padding:0 6px; }
+  .logo .mark { width:30px; height:30px; border-radius:8px; background:var(--blue); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; }
+  .logo .t { font-weight:700; color:var(--head); font-size:14px; }
+  .nav-item { padding:9px 12px; border-radius:8px; font-weight:600; color:var(--muted); font-size:13px; cursor:pointer; }
+  .nav-item.on { background:var(--blue-bg); color:var(--blue); }
+  .main { flex:1; padding:22px 26px; min-width:0; max-width:1200px; }
+  h1 { font-size:19px; color:var(--head); }
+  .sub { font-size:12px; color:var(--muted); margin-top:3px; }
+  .row { display:flex; gap:12px; margin-top:18px; flex-wrap:wrap; }
+  .tile { flex:1; min-width:150px; background:var(--panel); border:1px solid var(--border2); border-radius:10px; padding:14px 16px; }
+  .tile .l { font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:#7d8794; }
+  .tile .v { font-size:25px; font-weight:800; color:var(--head); margin-top:3px; }
+  .tile .s { font-size:11px; color:var(--muted); margin-top:2px; }
+  .card { background:var(--panel); border:1px solid var(--border2); border-radius:10px; padding:16px 18px; margin-top:14px; }
+  .card h2 { font-size:13px; color:var(--head); margin-bottom:10px; }
+  .card h2 .lite { font-weight:500; color:#7d8794; font-size:11px; margin-left:6px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th { text-align:right; color:#7d8794; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:4px 6px; }
+  th:first-child, td:first-child { text-align:left; }
+  td { text-align:right; padding:7px 6px; border-top:1px solid var(--border2); }
+  .bars { display:flex; align-items:flex-end; gap:4px; height:120px; margin-top:6px; }
+  .bar { flex:1; background:var(--blue); border-radius:3px 3px 0 0; min-height:2px; position:relative; }
+  .bar:hover::after { content:attr(data-tip); position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:var(--head); color:#fff; font-size:10px; padding:3px 7px; border-radius:5px; white-space:nowrap; margin-bottom:4px; z-index:2; }
+  .seg { display:inline-flex; gap:4px; background:#eef2f6; border:1px solid #dde3ea; border-radius:7px; padding:3px; }
+  .seg div { padding:4px 12px; border-radius:5px; color:#6b7480; font-size:12px; font-weight:600; cursor:pointer; }
+  .seg div.on { background:var(--blue); color:#fff; }
+  .login { max-width:320px; margin:12vh auto; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:26px; box-shadow:0 8px 30px rgba(15,23,42,.08); }
+  .login h1 { font-size:17px; } .login .sub { margin-bottom:16px; }
+  .login input { width:100%; padding:10px 12px; margin-bottom:10px; border:1px solid #d4dbe3; border-radius:6px; font-size:14px; outline:none; }
+  .login input:focus { border-color:var(--blue); }
+  .login button { width:100%; padding:10px; background:var(--blue); color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+  .err { color:var(--red); font-size:12px; margin-top:8px; min-height:14px; }
+  .foot { font-size:11px; color:var(--faint); margin-top:14px; }
+  .green { color:var(--green) !important; } .red { color:var(--red) !important; } .amber { color:var(--amber) !important; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const FN_BASE = "https://kyiutusjnzvtfriggbdk.supabase.co/functions/v1/admin";
+let tok = localStorage.getItem("admtok") || "";
+let refTok = localStorage.getItem("admref") || "";
+let rows = [], fixed = [], monthOffset = 0, timer = null;
+
+const $ = (h) => { document.getElementById("app").innerHTML = h; };
+const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
+const E = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function loginView(msg) {
+  $(`<div class="login">
+    <h1>Trusted Offers — Admin</h1>
+    <div class="sub">Sign in with your cockpit account</div>
+    <input id="em" type="email" placeholder="Email" autocomplete="username">
+    <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+    <button onclick="doLogin()">Sign in</button>
+    <div class="err">${E(msg || "")}</div>
+  </div>`);
+  document.getElementById("pw").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+}
+
+async function doLogin() {
+  const em = document.getElementById("em").value, pw = document.getElementById("pw").value;
+  try {
+    const r = await fetch("https://kyiutusjnzvtfriggbdk.supabase.co/auth/v1/token?grant_type=password", {
+      method: "POST", headers: { apikey: "sb_publishable_iVqN7F0CLatyYHkJbl-rMQ_BW_PiCT6", "content-type": "application/json" },
+      body: JSON.stringify({ email: em, password: pw }),
+    });
+    const d = await r.json();
+    if (!r.ok) return loginView(d.error_description || d.msg || "Sign-in failed");
+    tok = d.access_token; refTok = d.refresh_token;
+    localStorage.setItem("admtok", tok); localStorage.setItem("admref", refTok);
+    load();
+  } catch (e) { loginView("Sign-in failed: " + e.message); }
+}
+
+async function refreshTok() {
+  if (!refTok) return false;
+  try {
+    const r = await fetch("https://kyiutusjnzvtfriggbdk.supabase.co/auth/v1/token?grant_type=refresh_token", {
+      method: "POST", headers: { apikey: "sb_publishable_iVqN7F0CLatyYHkJbl-rMQ_BW_PiCT6", "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: refTok }),
+    });
+    if (!r.ok) return false;
+    const d = await r.json();
+    tok = d.access_token; refTok = d.refresh_token;
+    localStorage.setItem("admtok", tok); localStorage.setItem("admref", refTok);
+    return true;
+  } catch (e) { return false; }
+}
+
+// Small CSV parser (handles quoted fields with commas).
+function parseCsv(text) {
+  const out = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i+1] === '"') { cell += '"'; i++; }
+      else if (c === '"') q = false;
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i+1] === "\n") i++;
+      row.push(cell); out.push(row); row = []; cell = "";
+    } else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); out.push(row); }
+  return out;
+}
+const num = (s) => { const n = parseFloat(String(s ?? "").replace(/[^0-9.\-]/g, "")); return isFinite(n) ? n : 0; };
+
+async function load() {
+  $('<div style="padding:60px;text-align:center;color:#8a94a3">Loading spend…</div>');
+  let r = await fetch(FN_BASE + "/spend", { headers: { Authorization: "Bearer " + tok } });
+  if (r.status === 401 && await refreshTok()) {
+    r = await fetch(FN_BASE + "/spend", { headers: { Authorization: "Bearer " + tok } });
+  }
+  if (r.status === 401) return loginView("");
+  if (r.status === 403) return loginView("This page is for admins only.");
+  if (!r.ok) return loginView("Could not load the sheet (" + r.status + ")");
+  const grid = parseCsv(await r.text());
+  rows = []; fixed = [];
+  let inFixed = false;
+  for (const g of grid) {
+    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(g[0] ?? "")) {
+      rows.push({ d: g[0], texts: num(g[2]), resp: num(g[3]), leads: num(g[8]),
+                  sms: num(g[9]), salary: num(g[10]), total: num(g[11]), notes: (g[15] ?? "").trim() });
+    }
+    const label = (g[8] ?? "").trim();
+    if (/^fixed costs/i.test(label)) { inFixed = true; continue; }
+    if (inFixed) {
+      if (label && num(g[9]) > 0) fixed.push({ name: label, amt: num(g[9]) });
+      else if (!label) inFixed = false;
+    }
+  }
+  render();
+  if (!timer) timer = setInterval(load, 5 * 60 * 1000);   // live: re-pull every 5 min
+}
+
+function render() {
+  const now = new Date();
+  const m = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  const mKey = m.getFullYear() + "-" + String(m.getMonth() + 1).padStart(2, "0");
+  const mName = m.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const mRows = rows.filter(r => r.d.startsWith(mKey));
+  const isCur = monthOffset === 0;
+
+  const variable = mRows.reduce((a, r) => a + r.total, 0);
+  const sms = mRows.reduce((a, r) => a + r.sms, 0);
+  const salary = mRows.reduce((a, r) => a + r.salary, 0);
+  const fixedTotal = fixed.reduce((a, f) => a + f.amt, 0);
+  const total = variable + fixedTotal;
+  const leads = mRows.reduce((a, r) => a + r.leads, 0);
+  const texts = mRows.reduce((a, r) => a + r.texts, 0);
+  const cpl = leads ? (variable + fixedTotal) / leads : 0;
+
+  // pace: project month-end using average variable spend per elapsed day
+  const daysIn = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+  const elapsed = isCur ? now.getDate() : daysIn;
+  const projected = isCur && elapsed > 0 ? (variable / elapsed) * daysIn + fixedTotal : total;
+
+  const maxDay = Math.max(1, ...mRows.map(r => r.total));
+  const barHtml = mRows.map(r =>
+    `<div class="bar" style="height:${Math.round(r.total / maxDay * 110)}px" data-tip="${r.d.slice(5)} · ${money(r.total)} · ${r.leads} leads"></div>`).join("");
+
+  const latest = rows.length ? rows[rows.length - 1].d : "—";
+
+  $(`<div class="shell">
+    <div class="rail">
+      <div class="logo"><div class="mark">T</div><div class="t">Admin</div></div>
+      <div class="nav-item on">Marketing</div>
+    </div>
+    <div class="main">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="flex:1">
+          <h1>Marketing spend</h1>
+          <div class="sub">Live from the spend sheet · latest entry ${E(latest)} · refreshes every 5 min</div>
+        </div>
+        <div class="seg">
+          <div ${monthOffset === -1 ? 'class="on"' : ''} onclick="monthOffset=-1;render()">Last month</div>
+          <div ${monthOffset === 0 ? 'class="on"' : ''} onclick="monthOffset=0;render()">This month</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="tile"><div class="l">${E(mName)} total</div><div class="v">${money(total)}</div><div class="s">variable + fixed</div></div>
+        <div class="tile"><div class="l">Variable</div><div class="v">${money(variable)}</div><div class="s">SMS ${money(sms)} · texter ${money(salary)}</div></div>
+        <div class="tile"><div class="l">Fixed</div><div class="v">${money(fixedTotal)}</div><div class="s">${fixed.length} subscriptions</div></div>
+        ${isCur ? `<div class="tile"><div class="l">Projected month-end</div><div class="v amber">${money(projected)}</div><div class="s">at the current daily pace</div></div>` : ""}
+        <div class="tile"><div class="l">Leads · cost per lead</div><div class="v green">${leads}</div><div class="s">${money(cpl)} per lead all-in · ${texts.toLocaleString()} texts</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Daily spend<span class="lite">${E(mName)}</span></h2>
+        <div class="bars">${barHtml || '<div style="color:#8a94a3;font-size:12px">No entries yet this month</div>'}</div>
+      </div>
+
+      <div class="card">
+        <h2>Fixed monthly expenses</h2>
+        <table>
+          ${fixed.map(f => `<tr><td>${E(f.name)}</td><td>${money(f.amt)}</td></tr>`).join("")}
+          <tr><td style="font-weight:700;color:var(--head)">Total</td><td style="font-weight:700;color:var(--head)">${money(fixedTotal)}</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Daily log<span class="lite">newest first</span></h2>
+        <table>
+          <tr><th>Date</th><th>Texts</th><th>Responses</th><th>Leads</th><th>SMS</th><th>Texter</th><th>Total</th><th style="text-align:left;padding-left:14px">Notes</th></tr>
+          ${mRows.slice().reverse().map(r => `<tr>
+            <td>${E(r.d)}</td><td>${r.texts.toLocaleString()}</td><td>${r.resp.toLocaleString()}</td>
+            <td style="font-weight:700;color:var(--green)">${r.leads}</td>
+            <td>${money(r.sms)}</td><td>${money(r.salary)}</td><td style="font-weight:700">${money(r.total)}</td>
+            <td style="text-align:left;padding-left:14px;color:var(--muted)">${E(r.notes)}</td>
+          </tr>`).join("")}
+        </table>
+        <div class="foot">Numbers come straight from the Google Sheet — edit the sheet, this page follows.</div>
+      </div>
+    </div>
+  </div>`);
+}
+
+tok ? load() : loginView("");
+</script>
+</body>
+</html>
