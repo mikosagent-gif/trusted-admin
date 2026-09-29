@@ -138,7 +138,7 @@ async function load() {
   rows = []; fixed = [];
   let inFixed = false;
   for (const g of grid) {
-    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(g[0] ?? "")) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(g[0] ?? "")) {
       rows.push({ d: g[0], texts: num(g[2]), resp: num(g[3]), leads: num(g[8]),
                   sms: num(g[9]), salary: num(g[10]), total: num(g[11]), notes: (g[15] ?? "").trim() });
     }
